@@ -1,0 +1,3 @@
+[submodule "chxnet"]
+	path = chxnet
+	url = https://github.com/ChromoXYX/chxnet.git
