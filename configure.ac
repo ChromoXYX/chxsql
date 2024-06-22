@@ -39,6 +39,13 @@ AC_ARG_WITH([liburing],
 ]
 )
 
+AX_BOOST_BASE([1.75.0], [
+    __CHXSQL_TEST_CXXFLAGS="$__CHXSQL_TEST_CXXFLAGS $BOOST_CPPFLAGS"
+    __CHXSQL_TEST_LDADD="$__CHXSQL_TEST_LDADD $BOOST_LDFLAGS"
+], [
+    AC_MSG_ERROR(["cannot find boost"])
+])
+
 AC_PROG_CXX
 AC_CONFIG_FILES([
     Makefile

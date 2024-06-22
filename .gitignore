@@ -90,3 +90,5 @@ test/*
 
 configure~
 compile_commands.json
+.cache
+.utils
