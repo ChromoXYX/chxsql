@@ -1,8 +1,13 @@
 #include <chx/sql/mysql.hpp>
+#include <chx/ser2/cast_getter.hpp>
 #include <iostream>
+#include <chx/sql/mysql/impl/packets/handshake_response.hpp>
+#include <chx/sql/mysql/impl/auth/caching_sha2_password.hpp>
 
 namespace sql = chx::sql::mysql;
 namespace net = chx::net;
+namespace ser2 = chx::ser2;
+namespace rules = sql::detail::rules;
 
 int main() {
     net::io_context ctx;

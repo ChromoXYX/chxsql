@@ -1,10 +1,11 @@
 AC_INIT([0.0], [chxsql])
 AM_INIT_AUTOMAKE([-Werror -Wall foreign])
+: ${CXXFLAGS="-g -O0"}
 
 AC_SUBST(__CHXSQL_VERSION, ["0.0"])
 
-AC_SUBST(__CHXSQL_TEST_LDADD)
-AC_SUBST(__CHXSQL_TEST_CXXFLAGS)
+AC_SUBST(__CHXSQL_TEST_LDADD, ["-lcrypto -lssl"])
+AC_SUBST(__CHXSQL_TEST_CXXFLAGS, ["-std=c++17"])
 
 AC_ARG_WITH([liburing],
     AS_HELP_STRING([--with-liburing=<liburing-DIR>],

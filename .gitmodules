@@ -4,3 +4,6 @@
 [submodule "chxser2"]
 	path = chxser2
 	url = https://github.com/ChromoXYX/chxser2.git
+[submodule "chxlog"]
+	path = chxlog
+	url = https://github.com/ChromoXYX/chxlog.git

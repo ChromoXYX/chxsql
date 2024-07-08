@@ -5,10 +5,15 @@
 #include "../error_code.hpp"
 #include "./packets/handshake_v10.hpp"
 
+#include "./auth_plugin.hpp"
+#include "./auth/native_password.hpp"
+
+#include <chx/net/async_write_sequence_exactly.hpp>
 #include <chx/ser2/rule.hpp>
 #include <chx/ser2/bind.hpp>
 #include <chx/ser2/struct_getter.hpp>
 #include <chx/ser2/if.hpp>
+#include <chx/log.hpp>
 
 namespace chx::sql::mysql::detail {
 namespace tags {
@@ -16,16 +21,24 @@ struct connection_phase_operation {};
 }  // namespace tags
 
 template <> struct visitor<tags::connection_phase_operation> {
-    template <typename Stream, typename CntlType = int> struct operation {
+    template <typename Stream, typename CntlType = int>
+    struct operation : protected auth_plugin<
+                           operation<Stream, CntlType>,
+                           auth::native_password<operation<Stream, CntlType>>> {
         template <typename T> using rebind = operation<Stream, T>;
+
+        friend visitor<tags::native_pw>;
+
         using cntl_type = CntlType;
+        using auth_plugin_type =
+            auth_plugin<operation<Stream, CntlType>,
+                        auth::native_password<operation<Stream, CntlType>>>;
+        using auth_plugin_type::operator();
+        using auth_plugin_type::process_packet;
 
         struct ev_connect {};
-        template <typename Event> struct ev_recv_full_packet {};
-
-        struct ev_handshakeV10 {
-            using packet = packets::handshake_v10;
-        };
+        template <typename Event> struct ev_recv {};
+        struct ev_handshakeV10 {};
 
         connection<Stream>& c;
         net::ip::tcp::endpoint ep;
@@ -43,13 +56,13 @@ template <> struct visitor<tags::connection_phase_operation> {
         }
 
         void operator()(cntl_type& cntl) {
-            c.__M_stream.async_connect(
-                ep, cntl.template next_with_tag<ev_connect>());
+            c.stream().async_connect(ep,
+                                     cntl.template next_with_tag<ev_connect>());
         }
 
         void operator()(cntl_type& cntl, const std::error_code& e, ev_connect) {
             if (!e) {
-                recv_packet(ev_recv_full_packet<ev_handshakeV10>{});
+                recv_packet(ev_handshakeV10{});
             } else {
                 cntl.complete(e);
             }
@@ -57,36 +70,35 @@ template <> struct visitor<tags::connection_phase_operation> {
 
         template <typename Event>
         void operator()(cntl_type& cntl, const std::error_code& e,
-                        std::size_t s, ev_recv_full_packet<Event>) {
+                        std::size_t s, ev_recv<Event>) {
             if (!e) {
-                recv_packet_handle(e, s, ev_recv_full_packet<Event>{});
+                recv_packet_handle(e, s, ev_recv<Event>{});
             } else {
                 cntl.complete(e);
             }
         }
 
-        template <typename Event> void recv_packet(ev_recv_full_packet<Event>) {
+        template <typename Event> void recv_packet(Event) {
             __M_buf_sz = 0;
             __M_buf.clear();
-            recv_packet_next(ev_recv_full_packet<Event>{});
+            recv_packet_next(ev_recv<Event>{});
         }
 
-        template <typename Event>
-        void recv_packet_next(ev_recv_full_packet<Event>) {
+        template <typename Event> void recv_packet_next(ev_recv<Event>) {
             // there should be at least 128 bytes available in buffer after
             // buf_sz
             if (__M_buf_sz + 128 > __M_buf.size()) {
                 __M_buf.resize(__M_buf_sz + 128);
             }
-            c.__M_stream.async_read_some(
+            c.stream().async_read_some(
                 net::mutable_buffer(__M_buf.data() + __M_buf_sz,
                                     __M_buf.size() - __M_buf_sz),
-                cntl().template next_with_tag<ev_recv_full_packet<Event>>());
+                cntl().template next_with_tag<ev_recv<Event>>());
         }
 
         template <typename Event>
         void recv_packet_handle(const std::error_code& e, std::size_t s,
-                                ev_recv_full_packet<Event>) {
+                                ev_recv<Event>) {
             __M_buf_sz += s;
             if (__M_buf_sz >= 3) {
                 std::uint32_t packet_length =
@@ -97,38 +109,42 @@ template <> struct visitor<tags::connection_phase_operation> {
                                                              3);
                     if (sequence_id == next_sequence_id) {
                         next_sequence_id++;
-                        typename Event::packet packet;
-                        const char* begin = (const char*)__M_buf.data() + 4;
-                        ser2::ParseResult pr = packet.parse(
-                            begin, (const char*)__M_buf.data() + __M_buf_sz);
-                        printf("%s\n", packet.to_string().c_str());
-                        if ((begin - (const char*)__M_buf.data() ==
-                             packet_length + 4) &&
-                            pr == ser2::ParseResult::Ok) {
-                            return process_packet(packet);
-                        } else {
-                            // failed to parse packet
-                            return cntl().complete(
-                                make_ec(errc::CR_MALFORMED_PACKET));
-                        }
+                        return process_packet(Event{}, __M_buf.data(),
+                                              __M_buf.data() + packet_length +
+                                                  4);
                     } else {
                         // packet with wrong sequence id
                         return cntl().complete(
                             make_ec(errc::CR_MALFORMED_PACKET));
                     }
                 } else if (__M_buf_sz < packet_length + 4) {
-                    return recv_packet_next(ev_recv_full_packet<Event>{});
+                    return recv_packet_next(ev_recv<Event>{});
                 } else {
                     // packet with trailing data
                     return cntl().complete(make_ec(errc::CR_MALFORMED_PACKET));
                 }
             } else {
-                return recv_packet_next(ev_recv_full_packet<Event>{});
+                return recv_packet_next(ev_recv<Event>{});
             }
         }
 
-        void process_packet(packets::handshake_v10& packet) {
-            cntl().complete(std::error_code{});
+        void process_packet(ev_handshakeV10, const unsigned char* begin,
+                            const unsigned char* end) {
+            std::uint32_t packet_length =
+                fixed_length_integer_from_network<3>(begin);
+            assert(std::distance(begin, end) == packet_length + 4);
+            begin += 4;
+
+            packets::handshake_v10 handshake;
+            if (ser2::ParseResult r = handshake.parse(begin, end);
+                r != ser2::ParseResult::Ok || begin != end) {
+                return cntl().complete(make_ec(errc::CR_MALFORMED_PACKET));
+            }
+            printf("%s\n", handshake.to_string().c_str());
+
+            if (!auth_plugin_type::perform_auth(handshake)) {
+                return cntl().complete(make_ec(errc::CR_AUTH_PLUGIN_ERR));
+            }
         }
     };
 };
