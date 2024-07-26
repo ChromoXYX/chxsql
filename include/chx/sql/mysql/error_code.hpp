@@ -5,6 +5,7 @@
 namespace chx::sql::mysql {
 struct errc {
     enum errc_impl : int {
+        NO_ERROR = 0,
         EE_CANTCREATEFILE = 1,
         EE_READ = 2,
         EE_WRITE = 3,

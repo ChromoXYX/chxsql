@@ -1,16 +1,18 @@
 #pragma once
 
 #include "../basic_rules.hpp"
+#include <array>
 
 #include <chx/ser2/struct_getter.hpp>
+#include <chx/ser2/ignore.hpp>
 
 namespace chx::sql::mysql::detail::packets {
 struct ColumnDefinition41 {
-    std::string schema;
-    std::string table;
-    std::string org_table;
+    // std::string schema;
+    // std::string table;
+    // std::string org_table;
     std::string name;
-    std::string org_name;
+    // std::string org_name;
 
     std::uint16_t character_set;
     std::uint32_t column_length;
@@ -25,18 +27,18 @@ struct ColumnDefinition41 {
                                                            0x66};
                 return __c;
             }),
-            ser2::bind(rules::length_encoded_string{},
-                       ser2::struct_getter<&ColumnDefinition41::schema>{}),
-            ser2::bind(rules::length_encoded_string{},
-                       ser2::struct_getter<&ColumnDefinition41::table>{}),
-            ser2::bind(rules::length_encoded_string{},
-                       ser2::struct_getter<&ColumnDefinition41::org_table>{}),
+            ser2::bind(rules::length_encoded_string{}, ser2::ignore_getter{},
+                       ser2::default_require{}, ser2::ignore_setter{}),
+            ser2::bind(rules::length_encoded_string{}, ser2::ignore_getter{},
+                       ser2::default_require{}, ser2::ignore_setter{}),
+            ser2::bind(rules::length_encoded_string{}, ser2::ignore_getter{},
+                       ser2::default_require{}, ser2::ignore_setter{}),
             ser2::bind(rules::length_encoded_string{},
                        ser2::struct_getter<&ColumnDefinition41::name>{}),
-            ser2::bind(rules::length_encoded_string{},
-                       ser2::struct_getter<&ColumnDefinition41::org_name>{}),
+            ser2::bind(rules::length_encoded_string{}, ser2::ignore_getter{},
+                       ser2::default_require{}, ser2::ignore_setter{}),
 
-      rules::exactly([]() -> auto& {
+            rules::exactly([]() -> auto& {
                 static std::array<unsigned char, 1> __c = {0x0c};
                 return __c;
             }),
@@ -52,7 +54,9 @@ struct ColumnDefinition41 {
             ser2::bind(rules::fixed_length_integer<2>{},
                        ser2::struct_getter<&ColumnDefinition41::flags>{}),
             ser2::bind(rules::fixed_length_integer<1>{},
-                       ser2::struct_getter<&ColumnDefinition41::decimals>{}));
+                       ser2::struct_getter<&ColumnDefinition41::decimals>{}),
+            // why the unused 2 bytes not mentioned in docs?
+            rules::reserved<2>{});
     }
 };
 }  // namespace chx::sql::mysql::detail::packets

@@ -2,7 +2,7 @@
 
 #include <array>
 #include <cstdint>
-#include "../../basic_types.hpp"
+#include "../fixed_integer.hpp"
 
 namespace chx::sql::mysql::detail::packets {
 struct COM_Query {
@@ -11,10 +11,10 @@ struct COM_Query {
     // 3. ie, should never rely on chx.ser2 to generate binary data
 
     template <typename SQLQuery>
-    constexpr std::array<unsigned char, 5>
+    constexpr static std::array<unsigned char, 5>
     construct_header(std::uint8_t& next_sequence_id, const SQLQuery& query) {
         std::array<unsigned char, 5> ret;
-        fixed_length_integer_to_network<3>(std::size(query), ret.data());
+        fixed_length_integer_to_network<3>(std::size(query) + 1, ret.data());
         fixed_length_integer_to_network<1>(next_sequence_id++, ret.data() + 3);
         ret[4] = 0x03;
         return ret;

@@ -22,7 +22,7 @@ struct ERR_Packet {
         return ser2::rule(
             ser2::bind(rules::fixed_length_integer<1>(),
                        ser2::struct_getter<&ERR_Packet::header>{},
-                       [](std::uint8_t target, auto&&...) {
+                       [](auto& self, std::uint8_t target, auto&&...) {
                            return target == 0xff ? ser2::ParseResult::Ok
                                                  : ser2::ParseResult::Malformed;
                        }),
@@ -33,13 +33,10 @@ struct ERR_Packet {
                     return client_cap & capabilities_flags::CLIENT_PROTOCOL_41;
                 },
                 ser2::rule(
-                    ser2::bind(
-                        rules::fixed_length_integer<1>{},
-                        [](auto&&...) { return std::uint8_t{}; },
-                        [](const std::uint8_t& target, auto&&...) {
-                            return target == '#' ? ser2::ParseResult::Ok
-                                                 : ser2::ParseResult::Malformed;
-                        }),
+                    rules::exactly([]() -> auto& {
+                        static std::array<std::uint8_t, 1> a = {'#'};
+                        return a;
+                    }),
                     ser2::bind(rules::fixed_length_string<5>{},
                                ser2::struct_getter<&ERR_Packet::sql_state>{}))),
             ser2::bind(rules::rest_of_packet_string{},

@@ -5,6 +5,8 @@
 #include <charconv>
 #include <chx/ser2/rule.hpp>
 #include <chx/ser2/default_getter.hpp>
+#include <chx/ser2/default_require.hpp>
+#include <chx/ser2/ignore.hpp>
 #include <chx/ser2/bind.hpp>
 #include <cstdint>
 #include <string>
@@ -15,16 +17,20 @@
 
 namespace chx::sql::mysql::detail::rules {
 template <typename T> std::string replaceNonVcharWithEscape(const T& input) {
-    std::ostringstream oss;
-    for (unsigned char c : input) {
-        if (!isprint(c) || c >= 128) {
-            oss << '%' << std::hex << std::setw(2) << std::setfill('0')
-                << static_cast<int>(c);
-        } else {
-            oss << c;
+    if constexpr (std::is_same_v<std::decay_t<T>, ser2::ignore_t>) {
+        return "Ignore";
+    } else {
+        std::ostringstream oss;
+        for (unsigned char c : input) {
+            if (!isprint(c) || c >= 128) {
+                oss << '%' << std::hex << std::setw(2) << std::setfill('0')
+                    << static_cast<int>(c);
+            } else {
+                oss << c;
+            }
         }
+        return oss.str();
     }
-    return oss.str();
 }
 template <typename T> inline std::string octToHex(T t) {
     char buf[20] = {};
@@ -43,7 +49,7 @@ template <std::size_t N> struct fixed_length_integer {
         }
         std::uint64_t nv = 0;
         std::copy(begin, begin + N, (unsigned char*)&nv);
-        self.setter()(std::forward<UnsignedInteger>(v), nv);
+        self.setter()(self, ctx, std::forward<UnsignedInteger>(v), nv);
         begin += N;
         return ser2::ParseResult::Ok;
     }
@@ -69,11 +75,12 @@ template <std::size_t N> struct fixed_length_integer {
         }
         return std::copy_n((unsigned char*)&target, N, iter);
     }
+    constexpr ser2::default_getter getter() const noexcept(true) { return {}; }
 };
 struct length_encoded_integer {
     template <typename Self, typename Target, typename Context,
               typename RandomAccessIterator>
-    ser2::ParseResult parse(Self& self, Target&& ov, Context&,
+    ser2::ParseResult parse(Self& self, Target&& ov, Context& ctx,
                             RandomAccessIterator& begin,
                             const RandomAccessIterator& end) noexcept(true) {
         static_assert(sizeof(std::decay_t<Target>) >= 8);
@@ -85,7 +92,6 @@ struct length_encoded_integer {
         std::uint8_t head = *(begin++);
         if (head < 251) {
             nv = head;
-            return ser2::ParseResult::Ok;
         } else if (head == 0xfc) {
             if (l >= 3) {
                 std::copy_n(begin, 2, (unsigned char*)&nv);
@@ -110,7 +116,7 @@ struct length_encoded_integer {
         } else {
             return ser2::ParseResult::Malformed;
         }
-        self.setter()(std::forward<Target>(ov), nv);
+        self.setter()(self, ctx, std::forward<Target>(ov), nv);
         return ser2::ParseResult::Ok;
     }
 
@@ -162,17 +168,19 @@ struct length_encoded_integer {
         }
         return iter;
     }
+    constexpr ser2::default_getter getter() const noexcept(true) { return {}; }
 };
 
 template <std::size_t N> struct fixed_length_string {
     template <typename Self, typename Target, typename Context,
               typename RandomAccessIterator>
-    ser2::ParseResult parse(Self& self, Target&& target, Context&,
+    ser2::ParseResult parse(Self& self, Target&& target, Context& ctx,
                             RandomAccessIterator& begin,
                             const RandomAccessIterator& end) {
         std::ptrdiff_t l = std::distance(begin, end);
         if (l >= N) {
-            self.setter()(std::forward<Target>(target), begin, begin + N);
+            self.setter()(self, ctx, std::forward<Target>(target), begin,
+                          begin + N);
             begin += N;
             return ser2::ParseResult::Ok;
         } else {
@@ -202,11 +210,12 @@ template <std::size_t N> struct fixed_length_string {
         std::copy_n(std::data(target), std::min(std::size(target), N), iter);
         return iter + N;
     }
+    constexpr ser2::default_getter getter() const noexcept(true) { return {}; }
 };
 struct null_terminated_string {
     template <typename Self, typename Target, typename Context,
               typename RandomAccessIterator>
-    ser2::ParseResult parse(Self& self, Target&& target, Context&,
+    ser2::ParseResult parse(Self& self, Target&& target, Context& ctx,
                             RandomAccessIterator& begin,
                             const RandomAccessIterator& end) {
         std::ptrdiff_t l = std::distance(begin, end);
@@ -215,7 +224,8 @@ struct null_terminated_string {
             ++str_len;
         }
         if (str_len < l) {
-            self.setter()(std::forward<Target>(target), begin, begin + str_len);
+            self.setter()(self, ctx, std::forward<Target>(target), begin,
+                          begin + str_len);
             begin += str_len + 1;
             return ser2::ParseResult::Ok;
         } else {
@@ -247,6 +257,7 @@ struct null_terminated_string {
         *(iter++) = 0;
         return iter;
     }
+    constexpr ser2::default_getter getter() const noexcept(true) { return {}; }
 };
 template <typename TargetGetter, typename LengthGetter>
 struct variable_length_string : protected TargetGetter, protected LengthGetter {
@@ -271,6 +282,7 @@ struct variable_length_string : protected TargetGetter, protected LengthGetter {
         }
         if (l >= target_len) {
             self.setter()(
+                self, ctx,
                 TargetGetter::operator()(std::forward<Target>(target), ctx),
                 begin, begin + target_len);
             begin += target_len;
@@ -312,14 +324,15 @@ struct variable_length_string : protected TargetGetter, protected LengthGetter {
                     std::min(static_cast<size_t>(length), std::size(t)), iter);
         return iter + length;
     }
+    constexpr ser2::default_getter getter() const noexcept(true) { return {}; }
 };
 struct rest_of_packet_string {
     template <typename Self, typename Target, typename Context,
               typename RandomAccessIterator>
-    ser2::ParseResult parse(Self& self, Target&& target, Context&,
+    ser2::ParseResult parse(Self& self, Target&& target, Context& ctx,
                             RandomAccessIterator& begin,
                             const RandomAccessIterator& end) {
-        self.setter()(std::forward<Target>(target), begin, end);
+        self.setter()(self, ctx, std::forward<Target>(target), begin, end);
         begin = end;
         return ser2::ParseResult::Ok;
     }
@@ -346,13 +359,14 @@ struct rest_of_packet_string {
         std::copy(std::begin(target), std::end(target), iter);
         return iter + std::size(target);
     }
+    constexpr ser2::default_getter getter() const noexcept(true) { return {}; }
 };
 using plain_string = rest_of_packet_string;
 
 struct length_encoded_string {
     template <typename Self, typename Target, typename Context,
               typename RandomAccessIterator>
-    ser2::ParseResult parse(Self& self, Target&& target, Context&,
+    ser2::ParseResult parse(Self& self, Target&& target, Context& ctx,
                             RandomAccessIterator& begin,
                             const RandomAccessIterator& end) {
         std::size_t length = 0;
@@ -361,7 +375,7 @@ struct length_encoded_string {
         if (r == ser2::ParseResult::Ok) {
             std::ptrdiff_t l = std::distance(begin, end);
             if (l >= length) {
-                self.setter()(std::forward<Target>(target), begin,
+                self.setter()(self, ctx, std::forward<Target>(target), begin,
                               begin + length);
                 begin += length;
                 return r;
@@ -400,6 +414,7 @@ struct length_encoded_string {
                      ser2::bind(plain_string{}, ser2::default_getter{}));
         return r.generate(target, iter, end);
     }
+    constexpr ser2::default_getter getter() const noexcept(true) { return {}; }
 };
 
 template <std::size_t N> struct reserved {
@@ -452,7 +467,9 @@ template <typename T> struct exactly : protected T {
     parse(Self&, Target&&, Context&, RandomAccessIterator& begin,
           const RandomAccessIterator& end) noexcept(true) {
         const auto& t = T::operator()();
-        if (std::equal(std::begin(t), std::end(t), begin, end)) {
+        if (std::size(t) <= std::distance(begin, end) &&
+            std::equal(std::begin(t), std::end(t), begin,
+                       begin + std::size(t))) {
             begin += std::size(t);
             return ser2::ParseResult::Ok;
         } else {
@@ -500,9 +517,8 @@ struct repeat : protected SubRule, protected RepeatN {
                                       const RandomAccessIterator& end) {
         decltype(auto) t = SubRule::getter()(std::forward<Target>(target), ctx);
         using value_type = typename std::decay_t<decltype(t)>::value_type;
-        const std::size_t n =
-            ser2::detail::invoke(static_cast<RepeatN&>(*this),
-                                 std::forward<Target>(target), ctx, begin, end);
+        const std::size_t n = static_cast<RepeatN&>(*this)(
+            std::forward<Target>(target), ctx, begin, end);
         for (std::size_t i = 0; i < n; ++i) {
             value_type v;
             ser2::ParseResult r = SubRule::parse(static_cast<SubRule&>(*this),

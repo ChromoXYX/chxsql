@@ -1,0 +1,41 @@
+#pragma once
+
+namespace chx::sql::mysql {
+enum DataTypes {
+    Type_DECIMAL,
+    Type_TINY,
+    Type_SHORT,
+    Type_LONG,
+    Type_FLOAT,
+    Type_DOUBLE,
+    Type_NULL,
+    Type_TIMESTAMP,
+    Type_LONGLONG,
+    Type_INT24,
+    Type_DATE,
+    Type_TIME,
+    Type_DATETIME,
+    Type_YEAR,
+    Type_NEWDATE,
+    Type_VARCHAR,
+    Type_BIT,
+    Type_TIMESTAMP2,
+    Type_DATETIME2,
+    Type_TIME2,
+    Type_TYPED_ARRAY,
+    Type_VECTOR = 242,
+    Type_INVALID = 243,
+    Type_BOOL = 244,
+    Type_JSON = 245,
+    Type_NEWDECIMAL = 246,
+    Type_ENUM = 247,
+    Type_SET = 248,
+    Type_TINY_BLOB = 249,
+    Type_MEDIUM_BLOB = 250,
+    Type_LONG_BLOB = 251,
+    Type_BLOB = 252,
+    Type_VAR_STRING = 253,
+    Type_STRING = 254,
+    Type_GEOMETRY = 255
+};
+}

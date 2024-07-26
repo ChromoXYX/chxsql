@@ -18,7 +18,8 @@ struct handshake_v10 {
         return ser2::rule(
             ser2::bind(rules::fixed_length_integer<1>{},
                        ser2::struct_getter<&handshake_v10::protocol_version>{},
-                       [](const auto& target, auto&&...) -> ser2::ParseResult {
+                       [](auto& self, const auto& target,
+                          auto&&...) -> ser2::ParseResult {
                            return target == 10 ? ser2::ParseResult::Ok
                                                : ser2::ParseResult::Malformed;
                        }),
@@ -50,7 +51,7 @@ struct handshake_v10 {
                 ser2::bind(
                     rules::fixed_length_integer<1>{},
                     ser2::struct_getter<&handshake_v10::auth_plugin_data_len>{},
-                    [](const std::uint8_t& target,
+                    [](auto& self, std::uint8_t target,
                        auto&&...) -> ser2::ParseResult {
                         return target > 8 ? ser2::ParseResult::Ok
                                           : ser2::ParseResult::Malformed;

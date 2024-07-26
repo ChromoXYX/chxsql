@@ -19,23 +19,22 @@ struct OK_Packet {
     std::string info;
     std::string session_state_info;
 
+    template <std::uint8_t Header>
     constexpr auto rule(std::uint32_t client_cap) noexcept(true) {
         return ser2::rule{
             ser2::bind(rules::fixed_length_integer<1>{},
                        ser2::struct_getter<&OK_Packet::type>{},
-                       [](const auto& target, auto&&...) {
-                           return target == 0x00 ? ser2::ParseResult::Ok
-                                                 : ser2::ParseResult::Malformed;
+                       [](auto& self, const auto& target, auto&&...) {
+                           return target == Header
+                                      ? ser2::ParseResult::Ok
+                                      : ser2::ParseResult::Malformed;
                        }),
             ser2::bind(rules::length_encoded_integer{},
                        ser2::struct_getter<&OK_Packet::affected_rows>{}),
-            ser2::bind(
-                rules::length_encoded_integer{},
-                ser2::struct_getter<&OK_Packet::last_insert_id>{},
-                [](const auto& target) { return ser2::ParseResult::Ok; }),
+            ser2::bind(rules::length_encoded_integer{},
+                       ser2::struct_getter<&OK_Packet::last_insert_id>{}),
             ser2::bind(rules::fixed_length_integer<2>{},
-                       ser2::struct_getter<&OK_Packet::server_status>{},
-                       [](const auto&) { return ser2::ParseResult::Ok; }),
+                       ser2::struct_getter<&OK_Packet::server_status>{}),
             ser2::bind(rules::fixed_length_integer<2>{},
                        ser2::struct_getter<&OK_Packet::warning_count>{}),
 

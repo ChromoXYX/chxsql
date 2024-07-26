@@ -1,9 +1,9 @@
 #pragma once
 
 #include "../connection.hpp"
-#include "../basic_types.hpp"
 #include "../error_code.hpp"
 #include "./packets/handshake_v10.hpp"
+#include "./fixed_integer.hpp"
 
 #include "./auth_plugin.hpp"
 #include "./auth/native_password.hpp"
@@ -140,7 +140,6 @@ template <> struct visitor<tags::connection_phase_operation> {
                 r != ser2::ParseResult::Ok || begin != end) {
                 return cntl().complete(make_ec(errc::CR_MALFORMED_PACKET));
             }
-            printf("%s\n", handshake.to_string().c_str());
 
             if (!auth_plugin_type::perform_auth(handshake)) {
                 return cntl().complete(make_ec(errc::CR_AUTH_PLUGIN_ERR));

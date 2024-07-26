@@ -8,7 +8,7 @@
 
 #include "../visitor.hpp"
 #include "../../error_code.hpp"
-#include "../../basic_types.hpp"
+#include "../fixed_integer.hpp"
 #include "./hash_ctx.hpp"
 #include "../packets/handshake_v10.hpp"
 #include "../packets/handshake_response.hpp"
@@ -34,20 +34,15 @@ template <> struct visitor<tags::native_pw> {
                 return oper().cntl().complete(
                     make_ec(errc::CR_MALFORMED_PACKET));
             }
-            printf("enter\n");
             packets::handshake_response<std::array<unsigned char, 20>> resp =
                 {};
             resp.client_flag =
-                0x19ffa685 |
-                capabilities_flags::CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA |
-                capabilities_flags::CLIENT_PLUGIN_AUTH |
-                capabilities_flags::CLIENT_CONNECT_ATTRS &
-                    ~capabilities_flags::CLIENT_CONNECT_WITH_DB &
-                    ~capabilities_flags::CLIENT_ZSTD_COMPRESSION_ALGORITHM;
+                0x013ea20f | capabilities_flags::CLIENT_CONNECT_WITH_DB;
             oper().c.client_cap(resp.client_flag);
             resp.max_packet_size = 16777216;
             resp.character_set = 255;
             resp.username = "root";
+            resp.database = "test";
 
             try {
                 generate_pw(resp.auth_response.data(),
@@ -77,12 +72,12 @@ template <> struct visitor<tags::native_pw> {
                                                resp_data.data() + 3);
 
             try {
-                if (std::size_t sz= std::distance(resp_data.data(),
-                                  resp_rule.generate(resp, resp_data.data() + 4,
-                                                     resp_data.data() +
-                                                         resp_data.size()));sz !=
-                    payload_n + 4) {
-                        printf("%lu\n",sz);
+                if (std::size_t sz =
+                        std::distance(resp_data.data(),
+                                      resp_rule.generate(
+                                          resp, resp_data.data() + 4,
+                                          resp_data.data() + resp_data.size()));
+                    sz != payload_n + 4) {
                     return oper().cntl().complete(
                         make_ec(errc::CR_AUTH_PLUGIN_ERR));
                 }
@@ -102,7 +97,6 @@ template <> struct visitor<tags::native_pw> {
         template <typename CntlType>
         void operator()(CntlType& cntl, const std::error_code& e, std::size_t s,
                         ev_native_pw_send_handshake_response) {
-            printf("sent\n");
             if (!e) {
                 oper().recv_packet(
                     ev_native_pw_packet_after_handshake_response{});
@@ -126,7 +120,8 @@ template <> struct visitor<tags::native_pw> {
             std::uint8_t next_sequence_id = oper().next_sequence_id;
             if (packet_type == 0x00) {
                 packets::OK_Packet ok_packet;
-                auto&& rule = ok_packet.rule(oper().c.client_cap());
+                auto&& rule =
+                    ok_packet.template rule<0x00>(oper().c.client_cap());
                 if (ser2::ParseResult r = rule.parse(ok_packet, begin, end);
                     r != ser2::ParseResult::Ok || begin != end) {
                     return oper().cntl().complete(
@@ -141,7 +136,6 @@ template <> struct visitor<tags::native_pw> {
                     return oper().cntl().complete(
                         make_ec(errc::CR_MALFORMED_PACKET));
                 }
-                printf("%s\n", err_packet.error_message.c_str());
                 oper().cntl().complete(make_ec(err_packet.error_code));
             } else {
                 oper().cntl().complete(make_ec(errc::CR_AUTH_PLUGIN_ERR));
