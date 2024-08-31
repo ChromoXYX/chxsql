@@ -4,3 +4,4 @@
 #include "./mysql/exception.hpp"
 #include "./mysql/capabilities_flags.hpp"
 #include "./mysql/connection.hpp"
+#include "./mysql/result_set.hpp"

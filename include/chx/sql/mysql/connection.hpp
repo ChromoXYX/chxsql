@@ -3,9 +3,13 @@
 #include <utility>
 #include <chx/net/tcp.hpp>
 
-#include "./impl/visitor.hpp"
-
 namespace chx::sql::mysql {
+struct connect_parameters {
+    std::string username;
+    std::string password;
+    std::string database;
+};
+
 template <typename Stream> class connection {
     Stream __M_stream;
 
@@ -26,10 +30,10 @@ template <typename Stream> class connection {
     }
 
     template <typename CompletionToken>
-    decltype(auto) async_connect(const net::ip::tcp::endpoint& ep,
+    decltype(auto) async_connect(connect_parameters&& para,
                                  CompletionToken&& completion_token);
-    template <typename DataMapper, typename CompletionToken>
-    decltype(auto) async_query(std::string query, DataMapper&& data_mapper,
+    template <typename CompletionToken>
+    decltype(auto) async_query(std::string&& query,
                                CompletionToken&& completion_token);
 
     constexpr void client_cap(std::uint32_t new_value) noexcept(true) {
@@ -45,5 +49,5 @@ template <typename Stream> connection(Stream&) -> connection<Stream&>;
 template <typename Stream> connection(Stream&&) -> connection<Stream>;
 }  // namespace chx::sql::mysql
 
-#include "./impl/connection_phase.ipp"
-#include "./impl/com_query.ipp"
+#include "./detail/connection2.ipp"
+#include "./detail/com_query2.ipp"
