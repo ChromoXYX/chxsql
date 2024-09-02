@@ -5,6 +5,7 @@
 
 namespace chx::sql::postgresql::detail::msg {
 struct parameter_status {
+    static constexpr std::uint8_t message_type = 'S';
     constexpr ParseResult on_message_type(std::uint8_t type) const
         noexcept(true) {
         return type == 'S' ? ParseSuccess : ParseMalformed;

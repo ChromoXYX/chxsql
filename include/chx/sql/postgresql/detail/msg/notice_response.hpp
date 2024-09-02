@@ -7,6 +7,7 @@
 
 namespace chx::sql::postgresql::detail::msg {
 struct notice_response {
+    static constexpr std::uint8_t message_type = 'N';
     constexpr ParseResult on_message_type(std::uint8_t v) noexcept(true) {
         return v == 'N' ? ParseSuccess : ParseMalformed;
     }

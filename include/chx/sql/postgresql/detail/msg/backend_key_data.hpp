@@ -7,6 +7,8 @@ namespace chx::sql::postgresql::detail::msg {
 struct backend_key_data {
     std::uint32_t process_id = 0, secret_key = 0;
 
+    static constexpr std::uint8_t message_type = 'K';
+
     constexpr ParseResult on_message_type(std::uint8_t type) const
         noexcept(true) {
         return type == 'K' ? ParseSuccess : ParseMalformed;

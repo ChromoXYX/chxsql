@@ -28,6 +28,7 @@ struct authentication {
         }
     }
 
+    static constexpr std::uint8_t message_type = 'R';
     constexpr ParseResult on_message_type(std::uint8_t type) const
         noexcept(true) {
         return type == 'R' ? ParseSuccess : ParseMalformed;

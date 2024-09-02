@@ -10,6 +10,7 @@ namespace chx::sql::postgresql::detail::msg {
 struct error_response {
     errc ec;
 
+    static constexpr std::uint8_t message_type = 'E';
     constexpr ParseResult on_message_type(std::uint8_t v) noexcept(true) {
         return v == 'E' ? ParseSuccess : ParseMalformed;
     }
