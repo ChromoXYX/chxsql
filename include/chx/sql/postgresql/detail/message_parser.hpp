@@ -25,10 +25,13 @@ constexpr std::array<std::size_t, 256> msg_type_jump_table() {
 template <typename... Messages> struct message_parser {
     constexpr ParseResult operator()(const unsigned char*& begin,
                                      const unsigned char* end) {
-        while (begin < end) {
+        while (begin <= end) {
             switch (__M_state.index()) {
             case 0: {
                 // guess stage
+                if (begin == end) {
+                    return ParseNeedMore;
+                }
                 const std::uint8_t type = *(begin++);
                 __M_state.template emplace<1>();
                 if (jump_table[type] != -1) {
@@ -51,7 +54,7 @@ template <typename... Messages> struct message_parser {
                 ParseResult r = parser(begin, end);
                 if (r == ParseSuccess) {
                     body_remain = parser.value();
-                    if (body_remain <= 4) {
+                    if (body_remain < 4) {
                         return ParseMalformedIncomplete;
                     }
                     r = invoke_on_message_length<0>(__M_result.index(),
@@ -97,7 +100,7 @@ template <typename... Messages> struct message_parser {
             }
             }
         }
-        return ParseNeedMore;
+        assert(false);
     }
 
     constexpr std::variant<Messages..., msg::error_response,

@@ -44,3 +44,4 @@ template <typename Stream> connection(Stream&&) -> connection<Stream>;
 }  // namespace chx::sql::postgresql
 
 #include "./detail/connect.ipp"
+#include "./detail/simple_query.ipp"
