@@ -12,7 +12,9 @@ struct connect_parameters {
     std::string database;
 };
 
-template <typename Stream> class connection : CHXNET_NONCOPYABLE {
+template <typename Stream> class connection {
+    CHXNET_NONCOPYABLE
+
     template <typename Tag> friend struct detail::visitor;
 
     Stream __M_stream;

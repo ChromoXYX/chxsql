@@ -276,8 +276,6 @@ namespace std {
 template <>
 struct is_error_condition_enum<::chx::sql::postgresql::errc> : std::true_type {
 };
-template <>
-struct is_error_code_enum<::chx::sql::postgresql::errc> : std::true_type {};
 }  // namespace std
 
 namespace chx::sql::postgresql {
