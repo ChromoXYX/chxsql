@@ -9,9 +9,9 @@ template <typename Tag> struct async_operation;
 }
 
 namespace chx::sql::hiredis {
-template <typename Stream> class connection;
-
 class reply {
+    // since reply is fully polymorphic, it's useless to design a wrapper for
+    // it.
     template <typename> friend struct net::detail::async_operation;
 
     struct __free_reply {
@@ -26,6 +26,7 @@ class reply {
 
   public:
     reply(reply&&) = default;
+    reply& operator=(reply&&) = default;
 
     redisReply* operator->() const noexcept(true) { return __M_ptr.get(); }
     operator bool() const noexcept(true) { return __M_ptr.get(); }

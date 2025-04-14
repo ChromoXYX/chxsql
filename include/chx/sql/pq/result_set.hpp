@@ -71,6 +71,11 @@ class result_set {
         return PQparamtype(r(), idx);
     }
 
+    ExecStatusType result_status() const noexcept(true) {
+        return PQresultStatus(r());
+    }
+    std::string error_message() const { return PQresultErrorMessage(r()); }
+
     void print(FILE* out, const PQprintOpt& opt) const noexcept(true) {
         PQprint(out, r(), &opt);
     }

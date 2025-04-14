@@ -36,8 +36,27 @@ template <typename Stream> class connection {
     decltype(auto) async_connect(connect_parameters&& para,
                                  CompletionToken&& completion_token);
     template <typename CompletionToken>
-    decltype(auto) async_simple_query(std::string&& query,
-                                      CompletionToken&& completion_token);
+    [[deprecated]] decltype(auto)
+    async_simple_query(std::string&& query, CompletionToken&& completion_token);
+
+    template <typename CompletionToken>
+    decltype(auto) async_parse(std::string prepared_statement_name,
+                               std::string prepared_statement,
+                               CompletionToken&& completion_token);
+    template <typename... Parameters, typename CompletionToken>
+    decltype(auto) async_execute(const std::string& prepared_statement_name,
+                                 std::tuple<Parameters...> parameters,
+                                 CompletionToken&& completion_token);
+    template <typename... Parameters, typename CompletionToken>
+    decltype(auto)
+    async_execute_last(const std::string& prepared_statement_name,
+                       std::tuple<Parameters...> parameters,
+                       CompletionToken&& completion_token);
+
+    template <typename... Parameters, typename CompletionToken>
+    decltype(auto) async_execute_oneshot(std::string_view sql,
+                                         std::tuple<Parameters...> parameters,
+                                         CompletionToken&& completion_token);
 };
 template <typename Stream>
 connection(connection<Stream>&&) -> connection<Stream>;
@@ -47,3 +66,6 @@ template <typename Stream> connection(Stream&&) -> connection<Stream>;
 
 #include "./detail/connect.ipp"
 #include "./detail/simple_query.ipp"
+#include "./detail/parse_query.ipp"
+#include "./detail/execute.ipp"
+#include "./detail/oneshot.ipp"

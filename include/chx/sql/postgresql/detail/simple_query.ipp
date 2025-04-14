@@ -2,6 +2,11 @@
 
 #include "../connection.hpp"
 #include "./basic_type.hpp"
+#include "./basic_parser.hpp"
+#include "./msg/ready_for_query.hpp"
+#include "./msg/error_response.hpp"
+#include "./msg/notice_response.hpp"
+#include "./msg/parameter_status.hpp"
 #include "./msg/row_description.hpp"
 #include "./msg/data_row.hpp"
 #include "./msg/empty_query_response.hpp"
@@ -113,7 +118,7 @@ template <> struct visitor<tags::simple_query> {
                         if (__M_curr_type == __CurrRespType::WithDataWithDef) {
                             __M_parsers.template emplace<1>(
                                 msg::data_row{static_cast<std::uint16_t>(
-                                    __M_curr->__M_def.size())});
+                                    __M_curr->__M_desc.size())});
                         } else {
                             return cntl().complete(
                                 make_ec(errc::malformed_message),
@@ -160,7 +165,7 @@ template <> struct visitor<tags::simple_query> {
                         *std::get_if<1>(&__M_parsers);
                     ParseResult r = parser(begin, end);
                     if (r == ParseSuccess) {
-                        __M_curr->__M_result.emplace_back(
+                        __M_curr->__M_data.emplace_back(
                             std::move(parser.result.data));
                         __M_parsers.template emplace<0>();
                         break;
@@ -176,7 +181,7 @@ template <> struct visitor<tags::simple_query> {
                         *std::get_if<2>(&__M_parsers);
                     ParseResult r = parser(begin, end);
                     if (r == ParseSuccess) {
-                        __M_curr->__M_def = std::move(parser.result.desc);
+                        __M_curr->__M_desc = std::move(parser.result.desc);
                         __M_curr_type = __CurrRespType::WithDataWithDef;
                         __M_parsers.template emplace<0>();
                         break;

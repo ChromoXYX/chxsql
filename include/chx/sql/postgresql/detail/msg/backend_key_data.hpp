@@ -18,8 +18,8 @@ struct backend_key_data {
         return len == 12 ? ParseSuccess : ParseMalformed;
     }
 
-    constexpr ParseResult on_body(const unsigned char* begin,
-                                  const unsigned char* end) noexcept(true) {
+    ParseResult on_body(const unsigned char* begin,
+                        const unsigned char* end) noexcept(true) {
         ParseResult r = parser(begin, end);
         if (r == ParseSuccess) {
             if (stage == S1) {

@@ -37,8 +37,8 @@ struct authentication {
         noexcept(true) {
         return ParseSuccess;
     }
-    constexpr ParseResult on_body(const unsigned char* begin,
-                                  const unsigned char* end) noexcept(true) {
+    ParseResult on_body(const unsigned char* begin,
+                        const unsigned char* end) noexcept(true) {
         const std::size_t idx = parsers.index();
         if (idx == 0) {
             integer<std::uint32_t>& parser = *std::get_if<0>(&parsers);

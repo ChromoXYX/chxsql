@@ -2,14 +2,14 @@
 
 #include "../make_success.hpp"
 #include "../basic_type.hpp"
-#include "../../result_set.hpp"
+#include "../../result.hpp"
 
 #include <cassert>
 #include <variant>
 
 namespace chx::sql::postgresql::detail::msg {
 struct row_description {
-    std::vector<result_set::row_description_type> desc;
+    std::vector<postgresql::row_description> desc;
 
     static constexpr std::uint8_t message_type = 'T';
     constexpr ParseResult on_message_type(std::uint8_t type) noexcept(true) {
@@ -42,7 +42,7 @@ struct row_description {
                 string<>& parser = *std::get_if<1>(&__M_state);
                 ParseResult r = parser(begin, end);
                 if (r == ParseSuccess) {
-                    desc[__M_idx].field_name = parser.value();
+                    desc[__M_idx].field_name = std::move(parser.value());
                     __M_state.template emplace<2>();
                 } else {
                     return r;

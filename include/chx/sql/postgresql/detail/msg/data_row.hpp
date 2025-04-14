@@ -65,11 +65,11 @@ struct data_row {
                 byte<>& parser = *std::get_if<2>(&__M_state);
                 ParseResult r = parser(begin, end);
                 if (r == ParseSuccess) {
-                    data[__M_idx] = parser.value();
-                    if (++__M_idx < data.size()) {
-                        __M_state.template emplace<1>();
-                    } else {
+                    data[__M_idx] = std::move(parser.value());
+                    if (++__M_idx >= data.size()) {
                         return make_success(begin, end);
+                    } else {
+                        __M_state.template emplace<1>();
                     }
                 } else {
                     return r;

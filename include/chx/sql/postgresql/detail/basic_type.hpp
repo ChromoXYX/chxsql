@@ -11,14 +11,16 @@
 
 namespace chx::sql::postgresql::detail {
 template <typename T> struct integer {
-    constexpr ParseResult operator()(const unsigned char*& begin,
-                                     const unsigned char* end) noexcept(true) {
+    ParseResult operator()(const unsigned char*& begin,
+                           const unsigned char* end) noexcept(true) {
         const std::size_t consumed =
             std::min(static_cast<unsigned long>(std::distance(begin, end)),
                      sizeof(T) - __M_digits_consumed);
-        for (std::size_t i = 0; i < consumed; ++i) {
-            __M_result += *(begin++) << (8 * __M_digits_consumed++);
-        }
+        unsigned char* dest =
+            reinterpret_cast<unsigned char*>(&__M_result) + __M_digits_consumed;
+        std::memcpy(dest, begin, consumed);
+        __M_digits_consumed += consumed;
+        begin += consumed;
         if (__M_digits_consumed == sizeof(T)) {
             return ParseSuccess;
         } else {

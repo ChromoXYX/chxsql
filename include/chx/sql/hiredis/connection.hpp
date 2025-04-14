@@ -5,22 +5,19 @@
 #include <chx/net/detail/tracker.hpp>
 #include <chx/net/io_context.hpp>
 #include <chx/net/tcp.hpp>
+#include <chx/net/basic_stream_view.hpp>
 #include <chx/net/detail/remove_rvalue_reference.hpp>
 #include <poll.h>
 
-#include "./reply.hpp"
-
 namespace chx::sql::hiredis {
-template <typename Stream>
-class connection
-    : public net::detail::enable_weak_from_this<connection<Stream>> {
+class connection : public net::detail::enable_weak_from_this<connection> {
     CHXNET_NONCOPYABLE
 
     template <typename> friend struct net::detail::async_operation;
 
     redisAsyncContext* __M_ac = nullptr;
     net::io_context* const __M_ctx;
-    Stream __M_sock;
+    net::basic_stream_view<net::stream_base> __M_strm;
 
     net::cancellation_signal __M_poll_read;
     bool __M_poll_read_cancelled = false;
@@ -32,7 +29,7 @@ class connection
             return;
         }
         __M_poll_read_cancelled = false;
-        __M_sock.async_poll(
+        __M_strm.async_poll(
             POLLIN, bind_cancellation_signal(
                         __M_poll_read, [self = this->weak_from_this()](
                                            const std::error_code& e, int i) {
@@ -59,7 +56,7 @@ class connection
             return;
         }
         __M_poll_write_cancelled = false;
-        __M_sock.async_poll(
+        __M_strm.async_poll(
             POLLOUT, bind_cancellation_signal(
                          __M_poll_write, [self = this->weak_from_this()](
                                              const std::error_code& e, int i) {
@@ -87,14 +84,16 @@ class connection
     }
 
   public:
-    template <typename Strm>
-    connection(net::io_context& ctx, Strm&& sock)
-        : __M_ctx(&ctx), __M_sock(std::forward<Strm>(sock)) {
+    connection(net::io_context& ctx, const std::string& ip, unsigned short port)
+        : __M_ctx(&ctx), __M_strm(ctx) {
         redisOptions r = {};
-        r.type = REDIS_CONN_USERFD;
-        r.endpoint.fd = __M_sock.native_handler();
-        r.options = REDIS_OPT_NOAUTOFREEREPLIES;
+        r.type = REDIS_CONN_TCP;
+        r.endpoint.tcp.ip = ip.c_str();
+        r.endpoint.tcp.port = port;
+        r.options = REDIS_OPT_NOAUTOFREEREPLIES | REDIS_OPT_NOAUTOFREE;
 
+        // well, redisAsyncConnect* actually calls redisConnect, so it may be
+        // block?
         auto* ac = redisAsyncConnectWithOptions(&r);
         if (ac->err) {
             redisAsyncFree(ac);
@@ -118,11 +117,16 @@ class connection
         __M_ac->ev.cleanup = [](void* self) {
             static_cast<connection*>(self)->cleanup();
         };
+
+        redisAsyncSetConnectCallback(
+            __M_ac, [](const struct redisAsyncContext* ac, int status) {});
+
+        __M_strm.native_handler(__M_ac->c.fd);
     }
 
     ~connection() {
         if (__M_ac) {
-            __M_sock.release();
+            redisAsyncFree(std::exchange(__M_ac, nullptr));
         }
     }
 
@@ -135,13 +139,11 @@ class connection
         return __M_ac;
     }
 
-    template <typename CompletionToken>
-    decltype(auto) async_command(std::string_view format,
+    template <typename... Args, typename CompletionToken>
+    decltype(auto) async_command(const std::string& format,
+                                 std::tuple<Args...> args,
                                  CompletionToken&& completion_token);
 };
-template <typename Strm>
-connection(net::io_context&, Strm&&)
-    -> connection<typename net::detail::remove_rvalue_reference<Strm&&>::type>;
 }  // namespace chx::sql::hiredis
 
 #include "./impl/connection.ipp"
